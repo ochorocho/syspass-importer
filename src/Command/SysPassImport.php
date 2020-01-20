@@ -42,10 +42,12 @@ class SysPassImport extends Command
         $csv->delimiter = ";";
         $csv->parse($input->getArgument('file'));
 
-        /**
-         * Import CSV
-         */
+        $clients = $this->getClients($input);
+        $categories = $this->getCategories($input);
 
+        /**
+         * Build array of categories/clients to create
+         */
         $clientToCreate = [];
         $categoriesToCreate = [];
         foreach ($csv->data as $item) {
@@ -53,21 +55,40 @@ class SysPassImport extends Command
             $categoriesToCreate[] = $item['category'];
         }
 
+        $clientToCreate = array_unique($clientToCreate);
+        $categoriesToCreate = array_unique($categoriesToCreate);
+
+        /**
+         * Create clients
+         */
         foreach ($clientToCreate as $item) {
-            $client = $this->createClient($input, $item);
-            if (!empty($client->error)) {
-                $output->writeln("Could not create client: " . $client->error->message);
+            if(array_search($item, $clients)) {
+                $output->writeln("Client $item already exists");
             } else {
-                $output->writeln("Created client: " . $client->result->itemId . ' ' . $client->result->result->name);
+                $client = $this->createClient($input, $item);
+                if (!empty($client->error)) {
+                    $output->writeln("Could not create client: " . $client->error->message);
+                } else {
+                    $clients[$client->result->itemId] = $client->result->result->name;
+                    $output->writeln("Created client: " . $client->result->itemId . ' ' . $client->result->result->name);
+                }
             }
         }
 
+        /**
+         * Create categories
+         */
         foreach ($categoriesToCreate as $item) {
-            $category = $this->createCategory($input, $item);
-            if(!empty($category->error)) {
-                $output->writeln("Could not create category: " . $category->error->message);
+            if(array_search($item, $categories)) {
+                $output->writeln("Category $item already exists");
             } else {
-                $output->writeln("Created category: " . $category->result->itemId . ' ' . $category->result->result->name);
+                $category = $this->createCategory($input, $item);
+                if(!empty($category->error)) {
+                    $output->writeln("Could not create category: " . $category->error->message);
+                } else {
+                    $categories[$category->result->itemId] = $category->result->result->name;
+                    $output->writeln("Created category: " . $category->result->itemId . ' ' . $category->result->result->name);
+                }
             }
         }
 
@@ -103,45 +124,6 @@ class SysPassImport extends Command
             };
         }
 
-        /**
-         * Get Categories
-         */
-//        $categories = $this->getCategories($input);
-//        var_dump($categories);
-
-        /**
-         * Create new category
-         */
-//        $newCat = $this->createCategory($input, 'NeueCategory');
-//        var_dump($newCat);
-
-        /**
-         * Search clients
-         */
-//        $clients = $this->getClients($input);
-//        var_dump($clients);
-
-        /**
-         * Create client
-         */
-//        $createClient = $this->createClient($input, 'NEW TESTTETaaaaS');
-//        var_dump(is_null($createClient->error));
-
-        /**
-         * Create account
-         */
-//        $accountValues = [
-//                'name' => '#########',
-//                'categoryId' => 80,
-//                'clientId' => 109,
-//                'pass' => '#########',
-//                'userGroupId' => 2,
-//                'login' => '#########',
-//                'url' => 'http://www.google.de',
-//                'notes' => '#########',
-//            ];
-//        $huhu = $this->createAccount($input, $accountValues);
-
         return 0;
     }
 
@@ -150,7 +132,7 @@ class SysPassImport extends Command
      * @return array
      */
     protected function getClients($input) {
-        $clients = $this->apiRequest($input, "client/search");
+        $clients = $this->apiRequest($input, "client/search", ['count' => 10000]);
         $data = [];
 
         foreach ($clients->result->result as $client) {
@@ -177,7 +159,7 @@ class SysPassImport extends Command
      * @return array
      */
     protected function getCategories($input) {
-        $categories = $this->apiRequest($input, "category/search");
+        $categories = $this->apiRequest($input, "category/search", ['count' => 10000]);
         $data = [];
 
         /** @var TYPE_NAME $category */
