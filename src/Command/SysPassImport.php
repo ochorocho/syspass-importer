@@ -6,11 +6,11 @@ namespace App\Command;
 use GuzzleHttp\Client;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Symfony\Component\Console\Input\InputArgument;
 use ParseCsv\Csv;
 use Symfony\Component\Console\Helper\ProgressBar;
-use Symfony\Component\Console\Helper\Table;
 
 class SysPassImport extends Command
 {
@@ -33,13 +33,19 @@ class SysPassImport extends Command
         $this->addArgument('password', InputArgument::REQUIRED, 'API password');
         $this->addArgument('token', InputArgument::REQUIRED, 'API token');
         $this->addArgument('file', InputArgument::REQUIRED, 'CSV file to import');
+        $this->addOption('group-id', 'g', InputOption::VALUE_REQUIRED, 'CSV file to import', 1);
+        $this->addOption('failure', 'e', InputOption::VALUE_REQUIRED, 'Location of export file', './failed-import');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output)
     {
 
+        if (!mkdir($input->getOption('failure'), 0777, true) && !is_dir($input->getOption('failure'))) {
+            $output->writeln(sprintf('Directory "%s" already exists ...', $input->getOption('failure')));
+        }
+
         $csv = new Csv();
-        $csv->delimiter = ";";
+        $csv->delimiter = ';';
         $csv->parse($input->getArgument('file'));
 
         $clients = $this->getClients($input);
@@ -58,36 +64,52 @@ class SysPassImport extends Command
         $clientToCreate = array_unique($clientToCreate);
         $categoriesToCreate = array_unique($categoriesToCreate);
 
+        $output->writeln('<info>Import Clients ...</info>');
+
+        ProgressBar::setFormatDefinition('custom', ' %current%/%max% -- %message%');
+
+        $clientsProgress = new ProgressBar($output, count($clientToCreate));
+        $clientsProgress->setFormat('custom');
+
         /**
          * Create clients
          */
         foreach ($clientToCreate as $item) {
-            if(array_search($item, $clients)) {
-                $output->writeln("Client $item already exists");
-            } else {
+            $clientsProgress->setMessage('Processing client ' . $item);
+            $clientsProgress->advance();
+
+            if(!in_array($item, $clients, true)) {
                 $client = $this->createClient($input, $item);
+
                 if (!empty($client->error)) {
-                    $output->writeln("Could not create client: " . $client->error->message);
-                } else {
-                    $clients[$client->result->itemId] = $client->result->result->name;
-                    $output->writeln("Created client: " . $client->result->itemId . ' ' . $client->result->result->name);
+                    $csv = new Csv();
+                    $csv->delimiter = ";";
+                    $csv->enclose_all = true;
+                    $csv->save($input->getOption('failure') . DIRECTORY_SEPARATOR . 'accounts.csv', array(array($item, $client->error->message, $client->error->data)), true);
                 }
             }
         }
+
+        $output->writeln("\n<info>Import Categories ...</info>");
+
+        $categoriesProgress = new ProgressBar($output, count($categoriesToCreate));
+        $categoriesProgress->setFormat('custom');
 
         /**
          * Create categories
          */
         foreach ($categoriesToCreate as $item) {
-            if(array_search($item, $categories)) {
-                $output->writeln("Category $item already exists");
-            } else {
+            $categoriesProgress->setMessage('Processing category ' . $item);
+            $categoriesProgress->advance();
+
+            if(!in_array($item, $categories, true)) {
                 $category = $this->createCategory($input, $item);
+
                 if(!empty($category->error)) {
-                    $output->writeln("Could not create category: " . $category->error->message);
-                } else {
-                    $categories[$category->result->itemId] = $category->result->result->name;
-                    $output->writeln("Created category: " . $category->result->itemId . ' ' . $category->result->result->name);
+                    $csv = new Csv();
+                    $csv->delimiter = ";";
+                    $csv->enclose_all = true;
+                    $csv->save($input->getOption('failure') . DIRECTORY_SEPARATOR . 'accounts.csv', array(array($item, $category->error->message, $category->error->data)), true);
                 }
             }
         }
@@ -95,7 +117,14 @@ class SysPassImport extends Command
         $clients = $this->getClients($input);
         $categories = $this->getCategories($input);
 
+        $output->writeln("\n<info>Import Accounts ...</info>");
+
+        $accountsProgress = new ProgressBar($output, count($csv->data));
+        $accountsProgress->setFormat('custom');
+
         foreach ($csv->data as $item) {
+            $accountsProgress->setMessage('Processing account ' . $item['name']);
+            $accountsProgress->advance();
 
             $client = array_search($item['client'], $clients);
             $category = array_search($item['category'], $categories);
@@ -105,23 +134,20 @@ class SysPassImport extends Command
                 'categoryId' => $category,
                 'clientId' => $client,
                 'pass' => $item['password'],
-                'userGroupId' => 2,
+                'userGroupId' => $input->getOption('group-id'),
                 'login' => $item['login'],
                 'url' => $item['url'],
                 'notes' => $item['notes'],
             ];
 
             $client = $this->createAccount($input, $accountValues);
-            if(empty($client->error)) {
-                $output->writeln("Imported: " . $item['name'] . " (" . $item['url'] . ")");
-            } else {
+
+            if(!empty($client->error)) {
                 $csv = new Csv();
                 $csv->delimiter = ";";
                 $csv->enclose_all = true;
-                $csv->save('./data.csv', array(array($item['name'], $item['category'], $item['client'], $item['login'], $item['password'], $item['url'], $client->error->message, $client->error->data)), true);
-
-                $output->writeln("<error>Failed: " . $item['name'] . " (" . $item['login'] . ")" . '</error>');
-            };
+                $csv->save($input->getOption('failure') . DIRECTORY_SEPARATOR . 'accounts.csv', array(array($item['name'], $item['category'], $item['client'], $item['login'], $item['password'], $item['url'], $client->error->message, $client->error->data)), true);
+            }
         }
 
         return 0;
