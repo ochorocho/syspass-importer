@@ -19,6 +19,11 @@
         "guzzlehttp/guzzle": "^6.5",
         "symfony/dotenv": "^5.0",
         "symfony/console": "^5.0",
-        "parsecsv/php-parsecsv": "^1.2"
+        "parsecsv/php-parsecsv": "^1.2",
+      "ext-json": "*"
+    },
+    "require-dev": {
+        "codeception/codeception": "^4.0",
+        "codeception/module-asserts": "^1.0.0"
     }
 }

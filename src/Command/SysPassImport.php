@@ -14,16 +14,6 @@ use Symfony\Component\Console\Helper\ProgressBar;
 
 class SysPassImport extends Command
 {
-    /**
-     * @var array
-     */
-    protected  $categories = [];
-
-    /**
-     * @var array
-     */
-    protected  $clients = [];
-
     protected static $defaultName = 'syspass:import';
 
     protected function configure()
@@ -161,9 +151,8 @@ class SysPassImport extends Command
      */
     protected function getClients($input) {
         $clients = $this->apiRequest($input, "client/search", ['count' => 10000]);
-        $result = $clients->result->result;
 
-        return $this->resultToArray($result);
+        return $this->resultToArray($clients->result->result);
     }
 
     /**
@@ -183,9 +172,8 @@ class SysPassImport extends Command
      */
     protected function getCategories($input) {
         $categories = $this->apiRequest($input, "category/search", ['count' => 10000]);
-        $result = $categories->result->result;
 
-        return $this->resultToArray($result);
+        return $this->resultToArray($categories->result->result);
     }
 
     /**
