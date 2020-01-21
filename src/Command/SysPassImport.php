@@ -161,14 +161,9 @@ class SysPassImport extends Command
      */
     protected function getClients($input) {
         $clients = $this->apiRequest($input, "client/search", ['count' => 10000]);
-        $data = [];
+        $result = $clients->result->result;
 
-        foreach ($clients->result->result as $client) {
-            $data[$client->id] = $client->name;
-        }
-        $this->clients = $data;
-
-        return $data;
+        return $this->resultToArray($result);
     }
 
     /**
@@ -188,15 +183,9 @@ class SysPassImport extends Command
      */
     protected function getCategories($input) {
         $categories = $this->apiRequest($input, "category/search", ['count' => 10000]);
-        $data = [];
+        $result = $categories->result->result;
 
-        /** @var TYPE_NAME $category */
-        foreach ($categories->result->result as $category) {
-            $data[$category->id] = $category->name;
-        }
-        $this->categories = $data;
-
-        return $data;
+        return $this->resultToArray($result);
     }
 
     /**
@@ -257,5 +246,18 @@ class SysPassImport extends Command
         $json = $response->getBody()->getContents();
 
         return json_decode($json);
+    }
+
+    /**
+     * @param $result
+     * @return array
+     */
+    protected function resultToArray($result)
+    {
+        $data = [];
+        foreach ($result as $item) {
+            $data[$item->id] = $item->name;
+        }
+        return $data;
     }
 }
