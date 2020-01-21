@@ -40,8 +40,10 @@ class SysPassImport extends Command
     protected function execute(InputInterface $input, OutputInterface $output)
     {
 
-        if (!mkdir($input->getOption('failure'), 0777, true) && !is_dir($input->getOption('failure'))) {
+        if (is_dir($input->getOption('failure'))) {
             $output->writeln(sprintf('Directory "%s" already exists ...', $input->getOption('failure')));
+        } else {
+            mkdir($concurrentDirectory = $input->getOption('failure'), 0777, true);
         }
 
         $csv = new Csv();
