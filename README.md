@@ -13,6 +13,14 @@ cd syspass-importer
 composer install
 ```
 
+Set SysPass API authorizations for
+
+* New Account
+* Search for Category
+* New Category
+* New Client
+* Search for Client
+
 ## Run
 
 ```
